@@ -3,7 +3,7 @@
   import { TezosToolkit, ContractAbstraction, Wallet } from "@taquito/taquito";
   import { BeaconWallet } from "@taquito/beacon-wallet";
   import { NetworkType } from "@airgap/beacon-sdk";
-  import { TezBridgeWallet } from "@taquito/tezbridge-wallet";
+  //import { TezBridgeWallet } from "@taquito/tezbridge-wallet";
 
   const kolibriAddress = "KT1RXpLtz22YgX24QQhxKVyKvtKZFaAVtTB9";
   const ovenAddress = "KT1K4SGs8SNAtiZVJontHpCSiCtoLHj5ngLv";
@@ -17,17 +17,19 @@
   let userAddress: string;
   let availableTokens: number | undefined = undefined;
   let approvedTokensToSpend: number | undefined = undefined;
+  let loading = false;
+  let transferError: string | undefined;
 
-  const initTezbridge = async () => {
+  /*const initTezbridge = async () => {
     const newWallet = new TezBridgeWallet();
     Tezos.setWalletProvider(newWallet);
     userAddress = await newWallet.getPKH();
     wallet = newWallet;
-  };
+  };*/
 
   const initBeacon = async () => {
     const newWallet = new BeaconWallet({
-      name: "Beacon Test Dapp",
+      name: "Kolibri Test Faucet",
       eventHandlers: {
         ACTIVE_TRANSPORT_SET: {
           handler: async data => {
@@ -84,12 +86,19 @@
   };
 
   const transfer = async () => {
+    loading = true;
+    transferError = undefined;
     try {
       const op = await contract.methods.transfer_request(userAddress).send();
       console.log(op.opHash);
       await op.confirmation();
-    } catch (error) {
-      console.log(error);
+      approvedTokensToSpend -= 2;
+      availableTokens -= 2;
+    } catch (err) {
+      console.log(err);
+      transferError = JSON.stringify(err);
+    } finally {
+      loading = false;
     }
   };
 
@@ -125,7 +134,6 @@
 
     &:before,
     &:after {
-      animation: orbit 10s linear infinite;
       border-radius: 50%;
       box-shadow: 0 0 1rem 0 rgba(0, 0, 0, 0.2);
       content: "";
@@ -133,6 +141,7 @@
     }
 
     &:before {
+      animation: orbit 10s linear infinite;
       background: $green;
       background: linear-gradient(
         20deg,
@@ -141,11 +150,12 @@
       );
       height: 200px;
       width: 200px;
-      top: 30px;
+      top: 60px;
+      left: -30px;
     }
 
     &:after {
-      animation-delay: 5s;
+      animation: orbit 10s linear infinite reverse;
       background: $green;
       background: linear-gradient(
         -20deg,
@@ -217,29 +227,61 @@
     padding-top: calc(0.5em - 1px);
     text-align: center;
     white-space: nowrap;
+    outline: none;
+
+    &.error {
+      background-color: rgba(248, 113, 113, 1);
+    }
   }
 
-  .disconnect {
+  .header {
     position: absolute;
-    top: 20px;
-    right: 20px;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+    width: 100vw;
+    padding: 0px;
+    margin: 0px;
 
-    button {
-      appearance: none;
-      border: transparent;
-      background-color: transparent;
-      color: $green;
+    .links {
+      margin: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
       font-size: 1.2rem;
-      cursor: pointer;
+      a {
+        margin: 5px;
+        color: $green;
+      }
+    }
+
+    .disconnect {
+      color: $green;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      margin: 15px;
+
+      button {
+        appearance: none;
+        border: transparent;
+        background-color: transparent;
+        font-size: 1.2rem;
+        cursor: pointer;
+        outline: none;
+        color: $green;
+        margin: 5px;
+      }
     }
   }
 
   @keyframes orbit {
     from {
-      transform: rotate(0deg) translateX(150px) rotate(0deg);
+      transform: rotate(0deg) translateX(100px) rotate(0deg);
     }
     to {
-      transform: rotate(360deg) translateX(150px) rotate(-360deg);
+      transform: rotate(360deg) translateX(100px) rotate(-360deg);
     }
   }
 </style>
@@ -249,12 +291,33 @@
     src="hummingbird.svg"
     alt="hummingbird"
     class="hummingbird slide-in-elliptic-top-fwd"
+    class:pulsate-bck={loading}
   />
-  {#if wallet && userAddress}
-    <div class="disconnect">
-      <button on:click={disconnectWallet}>Disconnect wallet</button>
+  <div class="header">
+    <div class="links">
+      <a
+        href="https://testnet.kolibri.finance/"
+        target="_blank"
+        rel="noopener noreferrer nofollow">&#128279; kolibri.finance</a
+      >
+      <a
+        href="https://better-call.dev/delphinet/KT1RXpLtz22YgX24QQhxKVyKvtKZFaAVtTB9/operations"
+        target="_blank"
+        rel="noopener noreferrer nofollow">&#128279; kUSD Contract</a
+      >
     </div>
-  {/if}
+    {#if wallet && userAddress}
+      <div class="disconnect">
+        <a
+          href={`https://delphinet.tzkt.io/${userAddress}/operations/`}
+          target="_blank"
+          rel="noopener noreferrer nofollow">
+          <button>{userAddress.slice(0, 7)}...{userAddress.slice(-7)}</button>
+        </a>
+        <button on:click={disconnectWallet}>Disconnect wallet</button>
+      </div>
+    {/if}
+  </div>
   <div class="holder">
     <div class="card">
       <div class="card__content">
@@ -271,13 +334,28 @@
             : approvedTokensToSpend} kUSD
         </div>
         <br />
+        <div style="font-size:0.8rem">
+          There is a delay of 15 minutes between each available transfer
+        </div>
+        <br />
         <div>
           {#if !wallet && !userAddress}
             <button class="button" on:click={initBeacon}
               >Connect your wallet</button
             >
           {:else}
-            <button class="button" on:click={transfer}>Get 2 kUSD</button>
+            <button
+              class={`button ${!!transferError ? "error" : ""}`}
+              on:click={transfer}
+              disabled={loading || !!transferError}>
+              {#if !!transferError}
+                Error
+              {:else if !transferError && loading}
+                Transferring...
+              {:else}
+                Get 2 kUSD
+              {/if}
+            </button>
           {/if}
         </div>
       </div>
