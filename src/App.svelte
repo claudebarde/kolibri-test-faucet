@@ -5,6 +5,8 @@
   import { NetworkType } from "@airgap/beacon-sdk";
   //import { TezBridgeWallet } from "@taquito/tezbridge-wallet";
 
+  // https://ide.ligolang.org/p/Ce9Ql9Le9jsK0f63X0vSAQ
+
   const kolibriAddress = "KT1RXpLtz22YgX24QQhxKVyKvtKZFaAVtTB9";
   const ovenAddress = "KT1K4SGs8SNAtiZVJontHpCSiCtoLHj5ngLv";
   const contractAddress = "KT1MLPZy6ayaQwALYpGDfSDsWYQJLL8RjR68";
@@ -19,6 +21,9 @@
   let approvedTokensToSpend: number | undefined = undefined;
   let loading = false;
   let transferError: string | undefined;
+  let transferReady: boolean | undefined = undefined;
+  let timeSinceLastTransfer: number = 0;
+  let transferInterval;
 
   /*const initTezbridge = async () => {
     const newWallet = new TezBridgeWallet();
@@ -26,6 +31,14 @@
     userAddress = await newWallet.getPKH();
     wallet = newWallet;
   };*/
+
+  const millisToMinutesAndSeconds = millis => {
+    var minutes = Math.floor(millis / 60000);
+    var seconds = +((millis % 60000) / 1000).toFixed(0);
+    return seconds === 60
+      ? minutes + 1 + " 00 sec"
+      : minutes + " " + (seconds < 10 ? " min " : "min ") + seconds + " sec";
+  };
 
   const initBeacon = async () => {
     const newWallet = new BeaconWallet({
@@ -107,16 +120,35 @@
     contract = await Tezos.wallet.at(contractAddress);
     // fetches amount of tokens available
     kolibriContract = await Tezos.wallet.at(kolibriAddress);
-    const storage: any = await kolibriContract.storage();
-    const account = await storage.balances.get(adminAddress);
+    const kolibriStorage: any = await kolibriContract.storage();
+    const account = await kolibriStorage.balances.get(adminAddress);
     if (account) {
       availableTokens = account.balance.toNumber() / 10 ** 18;
       approvedTokensToSpend =
         (await account.approvals.get(contractAddress)).toNumber() / 10 ** 18;
     }
+    // checks if transfer is available
+    const storage: any = await contract.storage();
+    timeSinceLastTransfer = Date.now() - Date.parse(storage.last_transfer);
+    if (timeSinceLastTransfer > 1000 * 60 * 15) {
+      transferReady = true;
+    } else {
+      transferReady = false;
+      // sets interval
+      transferInterval = setInterval(() => {
+        timeSinceLastTransfer -= 1000;
+        if (timeSinceLastTransfer <= 0) {
+          transferReady = true;
+          clearInterval(transferInterval);
+        }
+      }, 1000);
+    }
   });
 
-  onDestroy(() => disconnectWallet());
+  onDestroy(() => {
+    disconnectWallet();
+    clearInterval(transferInterval);
+  });
 </script>
 
 <style lang="scss">
@@ -335,15 +367,23 @@
         </div>
         <br />
         <div style="font-size:0.8rem">
-          There is a delay of 15 minutes between each available transfer
+          {#if transferReady === undefined}
+            ---
+          {:else if transferReady}
+            Transfer available
+          {:else}
+            There is a delay of 15 minutes between each available transfer
+          {/if}
         </div>
         <br />
         <div>
-          {#if !wallet && !userAddress}
-            <button class="button" on:click={initBeacon}
-              >Connect your wallet</button
+          {#if !wallet && !userAddress && transferReady}
+            <button
+              class="button"
+              on:click={initBeacon}
+              disabled={!transferReady}>Connect your wallet</button
             >
-          {:else}
+          {:else if transferReady}
             <button
               class={`button ${!!transferError ? "error" : ""}`}
               on:click={transfer}
@@ -356,6 +396,8 @@
                 Get 2 kUSD
               {/if}
             </button>
+          {:else}
+            Waiting time: {millisToMinutesAndSeconds(timeSinceLastTransfer)}
           {/if}
         </div>
       </div>
