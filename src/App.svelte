@@ -9,12 +9,14 @@
 
   const kolibriAddress = "KT1RXpLtz22YgX24QQhxKVyKvtKZFaAVtTB9";
   const ovenAddress = "KT1K4SGs8SNAtiZVJontHpCSiCtoLHj5ngLv";
-  const contractAddress = "KT1MLPZy6ayaQwALYpGDfSDsWYQJLL8RjR68";
+  const contractAddress = "KT1Lgvr7eAkmfbyFE97bbXaYxZiSUatXsZmW"; //"KT1MLPZy6ayaQwALYpGDfSDsWYQJLL8RjR68";
   const adminAddress = "tz1Me1MGhK7taay748h4gPnX2cXvbgL6xsYL";
+  const harbingerAddress = "KT1LWDzd6mFhjjnb65a1PjHDNZtFKBieTQKH";
 
   let Tezos: TezosToolkit;
   let contract: ContractAbstraction<Wallet>;
   let kolibriContract: ContractAbstraction<Wallet>;
+  let harbingerContract: ContractAbstraction<Wallet>;
   let wallet: BeaconWallet; // | TezBridgeWallet;
   let userAddress: string;
   let availableTokens: number | undefined = undefined;
@@ -23,7 +25,8 @@
   let transferError: string | undefined;
   let transferReady: boolean | undefined = undefined;
   let timeSinceLastTransfer: number = 0;
-  let transferInterval;
+  let transferInterval, harbingerInterval;
+  let exchangeRate = 0;
 
   /*const initTezbridge = async () => {
     const newWallet = new TezBridgeWallet();
@@ -102,7 +105,10 @@
     loading = true;
     transferError = undefined;
     try {
-      const op = await contract.methods.transfer_request(userAddress).send();
+      const op = await contract.methods.transfer_request(userAddress).send({
+        amount: Math.floor((2000000 / exchangeRate) * 1000000),
+        mutez: true
+      });
       console.log(op.opHash);
       await op.confirmation();
       approvedTokensToSpend -= 2;
@@ -143,11 +149,26 @@
         }
       }, 1000);
     }
+    // gets harbinger exchange rate
+    harbingerContract = await Tezos.wallet.at(harbingerAddress);
+    const harbingerStorage: any = await harbingerContract.storage();
+    exchangeRate = (
+      await harbingerStorage.assetMap.get("XTZ-USD")
+    ).computedPrice.toNumber();
+    console.log(exchangeRate);
+    // creates interval to refresh exchange rate
+    harbingerInterval = setInterval(async () => {
+      const harbingerStorage: any = await harbingerContract.storage();
+      exchangeRate = (
+        await harbingerStorage.assetMap.get("XTZ-USD")
+      ).computedPrice.toNumber();
+    }, 60000);
   });
 
   onDestroy(() => {
     disconnectWallet();
     clearInterval(transferInterval);
+    clearInterval(harbingerInterval);
   });
 </script>
 
@@ -366,6 +387,10 @@
             : approvedTokensToSpend} kUSD
         </div>
         <br />
+        <div>
+          1 XTZ = {exchangeRate ? (exchangeRate / 10 ** 6).toFixed(2) : "---"} kUSD
+        </div>
+        <br />
         <div style="font-size:0.8rem">
           {#if transferReady === undefined}
             ---
@@ -393,7 +418,7 @@
               {:else if !transferError && loading}
                 Transferring...
               {:else}
-                Get 2 kUSD
+                Buy 2 kUSD
               {/if}
             </button>
           {:else}
