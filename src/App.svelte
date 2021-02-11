@@ -5,7 +5,7 @@
   import { NetworkType } from "@airgap/beacon-sdk";
   //import { TezBridgeWallet } from "@taquito/tezbridge-wallet";
 
-  // https://ide.ligolang.org/p/Ce9Ql9Le9jsK0f63X0vSAQ
+  // https://ide.ligolang.org/p/nOZlVLAz2H2y-4EbWCMxfA
 
   const kolibriAddress = "KT1RXpLtz22YgX24QQhxKVyKvtKZFaAVtTB9";
   const ovenAddress = "KT1K4SGs8SNAtiZVJontHpCSiCtoLHj5ngLv";
@@ -49,37 +49,37 @@
       eventHandlers: {
         ACTIVE_TRANSPORT_SET: {
           handler: async data => {
-            console.log("active transport set:", data);
+            //console.log("active transport set:", data);
           }
         },
         ACTIVE_ACCOUNT_SET: {
           handler: async data => {
-            console.log("active account set:", data);
+            //console.log("active account set:", data);
           }
         },
         PAIR_SUCCESS: {
           handler: async data => {
-            console.log("pair success:", data);
+            //console.log("pair success:", data);
           }
         },
         PERMISSION_REQUEST_SENT: {
           handler: async data => {
-            console.log("permission request success:", data);
+            //console.log("permission request success:", data);
           }
         },
         PERMISSION_REQUEST_SUCCESS: {
           handler: async data => {
-            console.log("permission request success:", data);
+            //console.log("permission request success:", data);
           }
         },
         OPERATION_REQUEST_SENT: {
           handler: async data => {
-            console.log("permission request success:", data);
+            //console.log("permission request success:", data);
           }
         },
         OPERATION_REQUEST_SUCCESS: {
           handler: async data => {
-            console.log("permission request success:", data);
+            //console.log("permission request success:", data);
           }
         }
       }
@@ -155,7 +155,6 @@
     exchangeRate = (
       await harbingerStorage.assetMap.get("XTZ-USD")
     ).computedPrice.toNumber();
-    console.log(exchangeRate);
     // creates interval to refresh exchange rate
     harbingerInterval = setInterval(async () => {
       const harbingerStorage: any = await harbingerContract.storage();
@@ -364,7 +363,8 @@
         <a
           href={`https://delphinet.tzkt.io/${userAddress}/operations/`}
           target="_blank"
-          rel="noopener noreferrer nofollow">
+          rel="noopener noreferrer nofollow"
+        >
           <button>{userAddress.slice(0, 7)}...{userAddress.slice(-7)}</button>
         </a>
         <button on:click={disconnectWallet}>Disconnect wallet</button>
@@ -412,7 +412,8 @@
             <button
               class={`button ${!!transferError ? "error" : ""}`}
               on:click={transfer}
-              disabled={loading || !!transferError}>
+              disabled={loading || !!transferError}
+            >
               {#if !!transferError}
                 Error
               {:else if !transferError && loading}
